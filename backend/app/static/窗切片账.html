@@ -42,26 +42,48 @@
         <p>关窗后按运单物化的正式切片。这是关窗管道产物，不是行程成对，也不是对齐差。</p>
       </header>
 
+      <section class="卷" id="切片写闸卡" data-testid="切片写闸卡">
+        <h2>封印与切片集</h2>
+        <div id="切片闸内容"><p class="说明条">写闸加载中…</p></div>
+      </section>
       <section class="卷">
-        <div class="工具"><button class="按钮 青" id="关">关当前窗</button></div>
-        <div class="表绕"><table><thead><tr><th>切片编号</th><th>窗号</th><th>运单键</th><th>事件数</th><th>物化时</th></tr></thead><tbody id="表"></tbody></table></div>
+        <div class="工具"><button class="按钮 青" id="关">关当前窗并封印</button> <pre class="回执" id="关窗回执" style="flex:1;min-width:260px"></pre></div>
+        <div class="表绕"><table><thead><tr><th>切片编号</th><th>窗号</th><th>运单键</th><th>事件数</th><th>窗起</th><th>窗止</th><th>命运</th><th>物化时</th></tr></thead><tbody id="表"></tbody></table></div>
       </section>
       <section class="卷">
         <div class="双栏">
-          <p class="说明">切片按运单聚合事件数。邻题空桩可改半截回滚/封印写闸，基线只做整窗物化。</p>
+          <p class="说明">切片按运单聚合事件数。关窗与封印写闸同事务完成；封后拒写不进缓冲，双写归档也不会改变本切片集。</p>
           <div class="侧注">去皮：关窗管道。勿抄对拍左右轨命名。</div>
         </div>
       </section>
       <script>
+      async function 刷写闸卡(关报) {
+        const g = await 潮切.getJSON("/api/写闸");
+        const fp = 关报 && 关报["切片集指纹"] ? ` · 本次指纹 ${关报["切片集指纹"]}` : "";
+        const next = g["封印态"] === "已封印"
+          ? "下一步：封后再灌并跑贯验，确认这里的切片集与指纹不变"
+          : "下一步：点「关当前窗并封印」物化切片并冻结切片集";
+        document.getElementById("切片闸内容").innerHTML =
+          `<div class="工具"><span class="徽章 ${g["封印态"] === "已封印" ? "危" : "好"}">${潮切.安全文本(g["封印态"])}</span>
+           <span class="徽章">${潮切.安全文本(g["策略"])}</span>
+           <span class="徽章 ${g["valid"] ? "好" : "危"}">valid=${g["valid"] ? "true" : "false"}</span></div>
+           <p class="说明" data-testid="切片封印详情">窗号 <b>${潮切.安全文本(g["窗号"])}</b> · 拒因/归档：${潮切.安全文本(g["拒因"] || g["归档键"] || "未封印")}${fp}<br><b>${next}</b></p>`;
+      }
       async function 刷() {
         const rows = await 潮切.getJSON("/api/窗切片账");
         const tb = document.getElementById("表"); tb.innerHTML = "";
-        if (!rows.length) { tb.innerHTML = `<tr><td colspan="5">${潮切.空态("尚无切片。装载窗内事件后点关当前窗。")}</td></tr>`; return; }
+        if (!rows.length) { tb.innerHTML = `<tr><td colspan="8">${潮切.空态("尚无切片。装载窗内事件后点关当前窗并封印。")}</td></tr>`; return; }
         for (const r of rows) {
-          tb.appendChild(潮切.行(`<td>${潮切.安全文本(r.切片编号)}</td><td>${潮切.安全文本(r.窗号)}</td><td>${潮切.安全文本(r.运单键)}</td><td>${r.事件数}</td><td>${潮切.安全文本(r.物化时)}</td>`));
+          tb.appendChild(潮切.行(`<td>${潮切.安全文本(r.切片编号)}</td><td>${潮切.安全文本(r.窗号)}</td><td>${潮切.安全文本(r.运单键)}</td><td>${r.事件数}</td><td>${潮切.安全文本(r.窗起)}</td><td>${潮切.安全文本(r.窗止)}</td><td>${潮切.徽章(r.命运)}</td><td>${潮切.安全文本(r.物化时)}</td>`));
         }
       }
-      document.getElementById("关").onclick = async () => { await 潮切.postJSON("/api/关窗/跑"); await 刷(); };
+      document.getElementById("关").onclick = async () => {
+        const r = await 潮切.postJSON("/api/关窗/跑");
+        document.getElementById("关窗回执").textContent = JSON.stringify(r, null, 2);
+        await 刷写闸卡(r);
+        await 刷();
+      };
+      刷写闸卡();
       刷();
       </script>
 

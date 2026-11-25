@@ -90,3 +90,45 @@ export function verifyExplainer(row) {
   if (row["是否对齐"]) return "缓冲已物化事件数与切片账事件数一致，窗账闭合。";
   return row["说明"] || "缓冲与切片撕裂，需回查关窗批次。";
 }
+
+export function currentBufferRows(rows, windowId) {
+  return (rows || []).filter((r) =>
+    r && r["命运"] === "在缓冲" && (!windowId || r["窗号"] === windowId));
+}
+
+export function didCurrentBufferGrow(beforeRows, afterRows, windowId) {
+  return currentBufferRows(afterRows, windowId).length
+    > currentBufferRows(beforeRows, windowId).length;
+}
+
+export const currentBufferDidGrow = didCurrentBufferGrow;
+export const bufferGrewAfterSeal = didCurrentBufferGrow;
+
+export function currentBufferCount(rows, windowId) {
+  return currentBufferRows(rows, windowId).length;
+}
+
+export function summarizeBufferGate(gate) {
+  if (!gate) return "写闸未加载";
+  const ref = gate["策略"] === "双写归档"
+    ? `归档键 ${gate["归档键"] || ""}`
+    : `拒因 ${gate["拒因"] || "未封印"}`;
+  return `${gate["窗号"] || "?"} · ${gate["封印态"] || "?"} · 现行 ${gate["现行缓冲行数"] ?? 0} · ${ref}`;
+}
+
+export function buildBufferGateCard(gate, rows) {
+  const windowId = gate?.["窗号"];
+  const current = currentBufferRows(rows, windowId);
+  return {
+    testId: "缓冲写闸条",
+    aliases: ["入窗缓冲写闸列表", "缓冲写闸信息"],
+    windowId: windowId || "",
+    sealed: gate?.["封印态"] === "已封印",
+    valid: Boolean(gate?.valid),
+    currentCount: current.length,
+    currentRows: current,
+    rejectedCount: gate?.["拒写笔数"] || 0,
+    archivedCount: gate?.["归档笔数"] || 0,
+    text: summarizeBufferGate(gate),
+  };
+}

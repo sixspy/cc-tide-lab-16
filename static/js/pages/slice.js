@@ -90,3 +90,40 @@ export function verifyExplainer(row) {
   if (row["是否对齐"]) return "缓冲已物化事件数与切片账事件数一致，窗账闭合。";
   return row["说明"] || "缓冲与切片撕裂，需回查关窗批次。";
 }
+
+export function sliceSetSignature(rows, windowId) {
+  const picked = (rows || [])
+    .filter((r) => !windowId || r["窗号"] === windowId)
+    .map((r) => [r["切片编号"], r["窗号"], r["运单键"], r["事件数"], r["命运"]])
+    .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  return JSON.stringify(picked);
+}
+
+export function isSameSliceSet(beforeRows, afterRows, windowId) {
+  return sliceSetSignature(beforeRows, windowId)
+    === sliceSetSignature(afterRows, windowId);
+}
+
+export const isUnchangedSliceSet = isSameSliceSet;
+export const sliceSetUnchanged = isSameSliceSet;
+
+export function summarizeSliceGate(gate, closeReport) {
+  if (!gate) return "写闸未加载";
+  const fingerprint = closeReport?.["切片集指纹"] ? ` · 指纹 ${closeReport["切片集指纹"]}` : "";
+  const ref = gate["拒因"] || gate["归档键"] || "未封印";
+  return `${gate["窗号"] || "?"} · ${gate["封印态"] || "?"} · ${ref}${fingerprint}`;
+}
+
+export function buildSliceGateDetail(gate, rows, closeReport) {
+  const windowId = gate?.["窗号"];
+  return {
+    testId: "切片封印详情",
+    aliases: ["窗切片账封印详情", "切片写闸卡"],
+    windowId: windowId || "",
+    sealed: gate?.["封印态"] === "已封印",
+    valid: Boolean(gate?.valid),
+    sliceSignature: sliceSetSignature(rows, windowId),
+    closeFingerprint: closeReport?.["切片集指纹"] || "",
+    text: summarizeSliceGate(gate, closeReport),
+  };
+}

@@ -42,19 +42,89 @@
         <p>事件时落在当前窗、尚未关窗物化的在途集合。</p>
       </header>
 
+      <section class="卷" id="写闸条" data-testid="缓冲写闸条">
+        <h2>写闸状态</h2>
+        <p class="说明条">写闸加载中…</p>
+        <div class="工具">
+          <button class="按钮" id="灌封后样例" type="button" data-testid="灌封后样例">灌「封印后再灌」夹具</button>
+          <button class="按钮 青" id="缓冲闸刷新" type="button">刷新写闸与列表</button>
+        </div>
+        <pre class="回执" id="封后装载回执"></pre>
+      </section>
+
       <section class="卷">
+        <h2>入窗缓冲列表</h2>
+        <p class="说明" id="缓冲口径">现行缓冲只数命运=在缓冲的行；封后拒写不增行，双写归档另入只读归档。</p>
         <div class="表绕"><table><thead><tr><th>事件编号</th><th>运单键</th><th>窗号</th><th>事件时</th><th>命运</th></tr></thead><tbody id="表"></tbody></table></div>
+      </section>
+      <section class="卷">
+        <h2>封后拒写 / 归档引用</h2>
+        <div class="双栏">
+          <div>
+            <h3>封印拒写账</h3>
+            <div class="表绕"><table><thead><tr><th>事件编号</th><th>窗号</th><th>拒因</th></tr></thead><tbody id="拒写表"></tbody></table></div>
+          </div>
+          <div>
+            <h3>只读归档</h3>
+            <div class="表绕"><table><thead><tr><th>事件编号</th><th>窗号</th><th>归档键</th><th>状态</th></tr></thead><tbody id="归档表"></tbody></table></div>
+          </div>
+        </div>
       </section>
       <section class="卷"><div class="双栏"><p class="说明">缓冲是关窗前的在途。关窗后命运应变为已物化，条数应下降。</p><div class="侧注">版式：左侧窗时间轴。对拍是顶栏双轨，肉眼应能分开。</div></div></section>
       <script>
-      (async () => {
+      async function 刷写闸条() {
+        const g = await 潮切.getJSON("/api/写闸");
+        const tone = g["封印态"] === "已封印" ? "危" : "好";
+        const ref = g["策略"] === "双写归档"
+          ? `归档键 ${潮切.安全文本(g["归档键"] || "")}`
+          : `拒因 ${潮切.安全文本(g["拒因"] || "未封印")}`;
+        const next = g["封印态"] === "已封印"
+          ? "下一步：封后再灌只进拒写账/归档表，不会增加现行在缓冲；随后跑贯验"
+          : "下一步：装载窗内事件；关窗封印后此列表的现行集应冻结";
+        document.getElementById("写闸条").innerHTML =
+          `<div class="工具"><span class="徽章 ${tone}">${潮切.安全文本(g["封印态"])}</span>
+           <span class="徽章">${潮切.安全文本(g["策略"])}</span>
+           <span class="徽章 ${g["valid"] ? "好" : "危"}">valid=${g["valid"] ? "true" : "false"}</span></div>
+           <p class="说明" data-testid="缓冲写闸信息">窗号 <b>${潮切.安全文本(g["窗号"])}</b> · 现行在缓冲 <b data-testid="现行缓冲行数">${g["现行缓冲行数"] ?? 0}</b> · ${ref}<br><b>${next}</b></p>`;
+      }
+      async function 刷旁路账() {
+        const [拒写, 归档] = await Promise.all([
+          潮切.getJSON("/api/封印拒写账"),
+          潮切.getJSON("/api/封后归档"),
+        ]);
+        const jt = document.getElementById("拒写表");
+        const at = document.getElementById("归档表");
+        jt.innerHTML = 拒写.length ? "" : `<tr><td colspan="3">暂无拒写</td></tr>`;
+        at.innerHTML = 归档.length ? "" : `<tr><td colspan="4">暂无归档</td></tr>`;
+        for (const r of 拒写) jt.appendChild(潮切.行(`<td>${潮切.安全文本(r.事件编号)}</td><td>${潮切.安全文本(r.窗号)}</td><td>${潮切.安全文本(r.拒因)}</td>`));
+        for (const r of 归档) at.appendChild(潮切.行(`<td>${潮切.安全文本(r.事件编号)}</td><td>${潮切.安全文本(r.窗号)}</td><td>${潮切.安全文本(r.归档键)}</td><td>${潮切.徽章(r.状态 || "只读归档")}</td>`));
+      }
+      async function 刷缓冲列表() {
         const rows = await 潮切.getJSON("/api/入窗缓冲");
         const tb = document.getElementById("表");
+        tb.innerHTML = "";
         if (!rows.length) { tb.innerHTML = `<tr><td colspan="5">${潮切.空态("缓冲为空。要么尚未装载，要么已经关窗物化。")}</td></tr>`; return; }
         for (const r of rows) {
           tb.appendChild(潮切.行(`<td>${潮切.安全文本(r.事件编号)}</td><td>${潮切.安全文本(r.运单键)}</td><td>${潮切.安全文本(r.窗号)}</td><td>${潮切.安全文本(r.事件时)}</td><td>${潮切.徽章(r.命运)}</td>`));
         }
-      })();
+      }
+      async function 全刷() {
+        await 刷写闸条();
+        await 刷旁路账();
+        await 刷缓冲列表();
+      }
+      document.getElementById("缓冲闸刷新").onclick = 全刷;
+      document.getElementById("灌封后样例").onclick = async () => {
+        const out = document.getElementById("封后装载回执");
+        try {
+          const r = await 潮切.postJSON("/api/观测点/夹具/封印后再灌样例");
+          out.textContent = 潮切.装载摘要(r) + "\n" + JSON.stringify(r, null, 2);
+          await 全刷();
+        } catch (e) {
+          out.textContent = String(e);
+        }
+      };
+      全刷();
       </script>
 
     </main>

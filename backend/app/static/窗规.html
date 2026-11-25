@@ -42,6 +42,19 @@
         <p>当前窗号、窗起止、窗长秒。邻题可改日界/水位空桩，勿改坏默认样例窗。</p>
       </header>
 
+      <section class="卷" id="写闸策略卡" data-testid="窗规策略写闸卡">
+        <h2>写闸策略与封印</h2>
+        <p class="说明">关窗时窗规封印、缓冲物化、写闸账在同一事务落票。封后灌入可切流拒写并钉拒因，也可双写只读归档而不涨现行缓冲。</p>
+        <div id="写闸卡"><p class="说明条">写闸加载中…</p></div>
+        <div class="工具">
+          <button class="按钮" id="策略拒" type="button">用切流拒写</button>
+          <button class="按钮 次" id="策略档" type="button">用双写归档</button>
+          <button class="按钮 青" id="闸刷新" type="button">刷新写闸</button>
+          <button class="按钮 次" id="闸解封" type="button" data-testid="解封按钮">解封并回放归档</button>
+        </div>
+        <pre class="回执" id="解封回执"></pre>
+        <pre class="回执" id="写闸原文"></pre>
+      </section>
       <section class="卷">
         <h2>窗规原文</h2>
         <pre class="回执" id="规">加载中…</pre>
@@ -55,10 +68,45 @@
         </div>
       </section>
       <script>
+      function 写闸卡片(g) {
+        const seal = g["封印态"] === "已封印" ? "危" : "好";
+        const valid = g["valid"] ? "好" : "危";
+        const tail = g["策略"] === "双写归档"
+          ? `归档键：${潮切.安全文本(g["归档键"] || "")}`
+          : `拒因：${潮切.安全文本(g["拒因"] || "未封印")}`;
+        const next = g["封印态"] === "已封印"
+          ? "下一步：到「入窗缓冲」看拒写/归档，再到「窗贯验」复验"
+          : "下一步：选定策略，灌窗内成片，再到「窗切片账」关窗封印";
+        return `<div class="工具">
+          <span class="徽章 ${seal}">${潮切.安全文本(g["封印态"] || "—")}</span>
+          <span class="徽章">${潮切.安全文本(g["策略"] || "—")}</span>
+          <span class="徽章 ${valid}">valid=${g["valid"] ? "true" : "false"}</span>
+        </div>
+        <p class="说明" data-testid="写闸只读信息">窗号 <b>${潮切.安全文本(g["窗号"] || "")}</b> · 现行缓冲 ${g["现行缓冲行数"] ?? 0} · 拒写 ${g["拒写笔数"] ?? 0} · 归档 ${g["归档笔数"] ?? 0}<br>${tail}<br><b>${next}</b></p>`;
+      }
+      async function 刷写闸() {
+        const g = await 潮切.getJSON("/api/写闸");
+        document.getElementById("写闸卡").innerHTML = 写闸卡片(g);
+        document.getElementById("写闸原文").textContent = JSON.stringify(g, null, 2);
+      }
+      async function 设策略(v) {
+        await 潮切.postJSON("/api/窗规", { "写闸策略": v });
+        await 刷写闸();
+      }
+      async function 解封并回放() {
+        const r = await 潮切.postJSON("/api/写闸/解封", { "重放归档": true });
+        document.getElementById("解封回执").textContent = JSON.stringify(r, null, 2);
+        await 刷写闸();
+      }
       (async () => {
         document.getElementById("规").textContent = JSON.stringify(await 潮切.getJSON("/api/窗规"), null, 2);
         const s = await 潮切.getJSON("/api/空桩");
         document.getElementById("空桩").textContent = "空桩 " + s.条数 + "：" + (s.空桩 || []).join(" · ");
+        document.getElementById("策略拒").onclick = () => 设策略("切流拒写");
+        document.getElementById("策略档").onclick = () => 设策略("双写归档");
+        document.getElementById("闸刷新").onclick = 刷写闸;
+        document.getElementById("闸解封").onclick = 解封并回放;
+        await 刷写闸();
       })();
       </script>
 

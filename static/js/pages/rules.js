@@ -90,3 +90,35 @@ export function verifyExplainer(row) {
   if (row["是否对齐"]) return "缓冲已物化事件数与切片账事件数一致，窗账闭合。";
   return row["说明"] || "缓冲与切片撕裂，需回查关窗批次。";
 }
+
+export function sealPolicyOptions() {
+  return [
+    { key: "切流拒写", label: "切流账册封印拒写", hint: "已封窗拒装载进该窗缓冲并钉拒因" },
+    { key: "双写归档", label: "双写两轨归档", hint: "封后写入进只读归档，现行缓冲不涨" },
+  ];
+}
+
+export function summarizeSealPolicy(gate) {
+  if (!gate) return "写闸未加载";
+  const ref = gate["策略"] === "双写归档"
+    ? (gate["归档键"] || "归档键缺失")
+    : (gate["拒因"] || "未封印");
+  return `${gate["窗号"] || "?"} · ${gate["封印态"] || "?"} · ${gate["策略"] || "?"} · ${ref} · valid=${gate["valid"] ? "true" : "false"}`;
+}
+
+export function buildSealPolicyCard(gate) {
+  const sealed = gate?.["封印态"] === "已封印";
+  return {
+    testId: "窗规策略写闸卡",
+    windowId: gate?.["窗号"] || "",
+    sealed,
+    policy: gate?.["策略"] || "切流拒写",
+    reason: gate?.["拒因"] || "",
+    archiveKey: gate?.["归档键"] || "",
+    valid: Boolean(gate?.valid),
+    nextAction: sealed
+      ? "到入窗缓冲查看拒写/归档，再跑窗贯验"
+      : "选择策略并装载窗内成片，然后关窗封印",
+    text: summarizeSealPolicy(gate),
+  };
+}

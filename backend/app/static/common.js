@@ -50,7 +50,9 @@ function 窗规一行(rules) {
 }
 function 装载摘要(report) {
   if (!report) return "";
-  return `入流 ${report["入流"] || 0} / 入缓冲 ${report["入缓冲"] || 0} / 迟到 ${report["迟到"] || 0} / 驳回 ${report["驳回"] || 0}`;
+  const seal = report["封印拒写"] ? ` / 封印拒写 ${report["封印拒写"]}` : "";
+  const archive = report["封后归档"] ? ` / 封后归档 ${report["封后归档"]}` : "";
+  return `入流 ${report["入流"] || 0} / 入缓冲 ${report["入缓冲"] || 0} / 迟到 ${report["迟到"] || 0} / 驳回 ${report["驳回"] || 0}${seal}${archive}`;
 }
 function 关窗摘要(report) {
   if (!report) return "";

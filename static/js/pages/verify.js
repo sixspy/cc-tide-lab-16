@@ -90,3 +90,33 @@ export function verifyExplainer(row) {
   if (row["是否对齐"]) return "缓冲已物化事件数与切片账事件数一致，窗账闭合。";
   return row["说明"] || "缓冲与切片撕裂，需回查关窗批次。";
 }
+
+export function verifyIsGreen(report) {
+  return Boolean(report?.["是否对齐"])
+    && !(report?.["写闸错误"] || []).length;
+}
+
+export const isGreen = verifyIsGreen;
+export const gateVerifyGreen = verifyIsGreen;
+
+export function summarizeGateVerify(report, gate) {
+  const errors = report?.["写闸错误"] || [];
+  if (errors.length) return errors.join("；");
+  if (!gate) return "写闸未加载";
+  return `${gate["窗号"] || "?"} 封印写闸一致 · valid=${gate["valid"] ? "true" : "false"}`;
+}
+
+export function buildVerifyGateCard(report, gate) {
+  const green = verifyIsGreen(report);
+  return {
+    testId: "贯验写闸卡片",
+    aliases: ["窗贯验写闸卡片", "贯验写闸详情"],
+    windowId: gate?.["窗号"] || report?.["封印窗"]?.[0] || "",
+    green,
+    valid: green && Boolean(gate?.valid),
+    errors: report?.["写闸错误"] || [],
+    sealedWindows: report?.["封印窗"] || [],
+    sliceFingerprint: report?.["切片集指纹"] || "",
+    text: summarizeGateVerify(report, gate),
+  };
+}

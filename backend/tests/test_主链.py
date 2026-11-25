@@ -8,13 +8,23 @@ os.environ["数据目录"] = _tmp
 os.environ["夹具目录"] = str(Path(__file__).resolve().parents[2] / "fixtures")
 
 from app import seed
+from app.db import 库路径
 from app.services import 装载, 关窗, 贯验, 目录, 时间, 校验, 夹具
 
 
 @pytest.fixture(autouse=True)
 def _db():
+    # 封印态现在是持久编排状态；每个用例必须拿到未封印的新库。
+    if 库路径.exists():
+        库路径.unlink()
     seed.初始化库()
     yield
+
+
+def teardown_module(module):
+    if 库路径.exists():
+        库路径.unlink()
+    seed.初始化库()
 
 
 def test_窗内装载入缓冲():
